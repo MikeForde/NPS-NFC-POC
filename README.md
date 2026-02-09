@@ -53,7 +53,7 @@ The app integrates with the IPS MERN WebApp to fetch patient data.
 
 ### Supported backends
 
-- http://localhost:5050 (via adb reverse)
+- http://localhost:5049 (via adb reverse)
 - https://ipsmern-dep.azurewebsites.net (All patient data shown is fictitious)
 
 ### Record Identifier Protection
@@ -140,7 +140,7 @@ A Settings button (⚙️) allows switching between backends and protection leve
 
 ## Development & Testing Notes
 ### Local testing
-<pre>adb reverse tcp:5050 tcp:5050</pre>
+<pre>adb reverse tcp:5049 tcp:5049</pre>
 
 Then select Local in the app’s Settings menu.
 
