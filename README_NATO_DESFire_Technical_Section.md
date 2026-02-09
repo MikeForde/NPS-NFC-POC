@@ -1,6 +1,6 @@
-## Technical notes: DESFire NATO NDEF layout (language-agnostic)
+## Technical notes: DESFire NDEF layout (language-agnostic)
 
-This project implements a **“pure” NFC Forum Type 4 / DESFire** layout commonly used for a NATO-style NDEF card:
+This project implements a **“pure” NFC Forum Type 4 / DESFire** layout for a NATO-style NDEF card:
 
 - **One DESFire application**
   - **AID:** `000001` (note: DESFire AIDs are *LSB-first* when sent in native commands)
