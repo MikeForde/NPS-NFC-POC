@@ -24,7 +24,7 @@ The layout works with readers that expect **Type 4 NDEF files**:
   - `INS = <DESFire native instruction>`
   - `P1=0x00 P2=0x00`
   - `Lc = len(data)` then `<data>` then `Le=0x00`
-- The code relies on a DESFire library for authentication / read / write primitives, but the *on-card layout* is independent of language/library.
+- The GitHub code relies on a DESFire library for authentication / read / write primitives, but the *on-card layout* is independent of language/library.
 
 Native `INS` values used:
 - `0xCA` — CreateApplication
@@ -202,30 +202,75 @@ It supports both:
 - **Short Record (SR=1)** when payload < 256 bytes
 - **Normal record (SR=0)** otherwise
 
-### Recommended MIME types (used in this project)
+### MIME record structure and payload semantics (for reference)
 
-For the NATO card payloads we ended up standardising on gzip-compressed payloads with versioned, namespaced MIME types:
-- **NPS (E104)**: application/x.nps.gzip.v1-0
-- **EXTRA (E105)**: application/x.ext.gzip.v1-0
+For the NATO card payloads we standardise on **gzip-compressed JSON payloads** with
+versioned, namespaced MIME types. These are not generic placeholders: they correspond
+to two specific, agreed data semantics.
 
-Why these work well in practice:
-- They’re explicit about **compression** (.gzip) so readers know they must decompress.
-- They’re **versioned** (v1-0) so you can evolve the format without breaking older readers.
-- They’re still plain MIME strings, so they fit cleanly into an NDEF MIME record.
+#### MIME types used
 
-What the payload bytes actually are is up to you, but the pattern is typically:
-- Payload bytes = gzip( <original bytes> )
-- Where <original bytes> might be JSON (common), CBOR, protobuf, or any other binary format.
+- **NPS (E104, read-only)**  
+  `application/x.nps.gzip.v1-0`
 
-### Record layout (single-record MIME message)
-A typical single-record MIME NDEF message is:
-- Record header: MB=1, ME=1, SR as needed, TNF=0x02
+- **EXTRA (E105, read/write)**  
+  `application/x.ext.gzip.v1-0`
+
+#### Payload meaning
+
+Each MIME type implies both **compression** and **content semantics**:
+
+- **E104 / NPS (read-only)**
+    - Payload is a **gzip-compressed binary JSON document**
+    - The uncompressed content represents the **Historic NPS dataset**
+    - Structure conforms to the agreed **Draft‑07 JSON Schema** for Historic NPS
+    - This file is written by the issuer and locked after writing
+
+- **E105 / EXTRA (read/write)**
+    - Payload is a **gzip-compressed binary JSON document**
+    - The uncompressed content represents the **Operational (mutable) NPS dataset**
+    - Structure conforms to the agreed **Draft‑07 JSON Schema** for Operational NPS
+    - This file is intended to be updated in the field
+
+Both schemas are publicly viewable here:  
+https://ipsmern-dep.azurewebsites.net/schemaviewer
+
+#### Why gzip + versioned MIME types
+
+This combination was chosen because:
+
+- The `.gzip` suffix makes compression **explicit**, so readers know decompression
+  is mandatory before parsing.
+- The `v1-0` suffix provides **forwards compatibility**, allowing schema evolution
+  without breaking existing readers.
+- The MIME strings remain standard ASCII and fit cleanly into an
+  **NFC Forum NDEF MIME record** (TNF = `0x02`).
+
+#### NDEF record structure
+
+A single-record MIME NDEF message is used in all cases:
+
+- Record header: `MB=1`, `ME=1`, `SR` as required, `TNF=0x02`
 - TYPE LENGTH: length of the ASCII MIME string
-- PAYLOAD LENGTH: 1 byte (SR) or 4 bytes (non-SR)
-- TYPE: the MIME string
-- PAYLOAD: your bytes (e.g. JSON, CBOR, gzip, etc.)
+- PAYLOAD LENGTH:
+    - 1 byte if `SR=1` (payload < 256 bytes)
+    - 4 bytes if `SR=0`
+- TYPE: MIME string (e.g. `application/x.nps.gzip.v1-0`)
+- PAYLOAD: `gzip( JSON bytes )`
 
-**Note:** regardless of record structure, the *Type 4 file wrapper* is always `NLEN + NDEF message bytes`.
+**Important:** regardless of record size or SR flag, the enclosing **Type 4 NDEF file**
+always follows the same wrapper:
+
+```
+[ NLEN (2 bytes, big‑endian) ][ NDEF message bytes ]
+```
+
+Readers must always:
+1. Read `NLEN`
+2. Read exactly `NLEN` bytes of NDEF data
+3. Parse the MIME record
+4. Decompress the payload
+
 
 ---
 
