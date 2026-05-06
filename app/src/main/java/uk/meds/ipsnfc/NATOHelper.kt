@@ -22,7 +22,7 @@ data class NatoPayload(
  *
  *  - Single NDEF Tag application (AID 000001).
  *  - Inside that application:
- *      File 1 (E103): CC file, 32 bytes, with TWO TLVs
+ *      File 1 (E103): CC file, 23 bytes, with TWO TLVs
  *          - TLV 1 -> NDEF file for NPS (E104)
  *          - TLV 2 -> NDEF file for EXTRA (E105)
  *      File 2 (E104): NPS NDEF file (read-only, written by issuer)
@@ -212,7 +212,7 @@ class NATOHelper private constructor(
      * 1) formatPICC()  -> erase all apps/files
      * 2) Create NFC Forum NDEF application (AID 000001, ISO DF name D2760000850101)
      * 3) Inside that app, create:
-     *      - CC file   (fileNo=1, ISO FID E103, size 32)
+     *      - CC file   (fileNo=1, ISO FID E103, size 23)
      *      - NPS file  (fileNo=2, ISO FID E104, size = npsCapacityBytes, RO)
      *      - EXTRA file(fileNo=3, ISO FID E105, size = extraCapacityBytes, RW)
      * 4) Write CC with TWO TLVs (NPS + EXTRA).
@@ -385,7 +385,7 @@ class NATOHelper private constructor(
             val cc = ByteArray(CC_FILE_SIZE) { 0 }
 // Header
             cc[0] = 0x00
-            cc[1] = 0x17               // CCLEN = 32
+            cc[1] = 0x17               // CCLEN = 23
             cc[2] = 0x20               // Mapping version 2.0
             cc[3] = 0x00
             cc[4] = 0x3B               // MLe
