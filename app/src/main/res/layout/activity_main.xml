@@ -9,7 +9,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <!-- Header -->
         <!-- Header row -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -44,8 +43,7 @@
             android:alpha="0.2"
             android:layout_marginBottom="4dp" />
 
-        <!-- IPS WebApp picker (compact row) -->
-
+        <!-- IPS WebApp picker -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -85,8 +83,6 @@
             android:layout_marginBottom="6dp" />
 
         <!-- Primary actions -->
-
-        <!-- Write row -->
         <LinearLayout
             android:orientation="horizontal"
             android:layout_width="match_parent"
@@ -118,7 +114,6 @@
                 android:textAllCaps="false" />
         </LinearLayout>
 
-        <!-- Read row -->
         <LinearLayout
             android:orientation="horizontal"
             android:layout_width="match_parent"
@@ -173,7 +168,6 @@
                     android:layout_height="wrap_content"
                     android:paddingTop="8dp">
 
-                    <!-- RO tab content -->
                     <LinearLayout
                         android:id="@+id/tab_ro"
                         android:layout_width="match_parent"
@@ -194,7 +188,6 @@
                             android:scrollbars="vertical"
                             android:padding="8dp"
                             android:hint="Vanilla NFC Readable (read-only)"
-
                             android:textSize="12sp"
                             android:typeface="monospace"
                             android:lineSpacingExtra="2dp"
@@ -202,7 +195,6 @@
                             android:scrollbarStyle="insideOverlay"/>
                     </LinearLayout>
 
-                    <!-- RW tab content -->
                     <LinearLayout
                         android:id="@+id/tab_rw"
                         android:layout_width="match_parent"
@@ -223,7 +215,6 @@
                             android:fadeScrollbars="false"
                             android:padding="8dp"
                             android:hint="Hidden data (read/write)"
-
                             android:textSize="12sp"
                             android:typeface="monospace"
                             android:lineSpacingExtra="2dp"
@@ -260,23 +251,23 @@
                 android:textAllCaps="false"
                 android:textColor="@android:color/holo_red_dark" />
 
-<!--            <Button-->
-<!--                android:id="@+id/buttonFormatForNDEF"-->
-<!--                android:layout_width="0dp"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:layout_weight="1"-->
-<!--                android:text="Dual"-->
-<!--                android:textAllCaps="false"-->
-<!--                android:textColor="@android:color/holo_red_dark" />-->
+            <Button
+                android:id="@+id/buttonFormatForNDEF"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Dual"
+                android:textAllCaps="false"
+                android:textColor="@android:color/holo_red_dark" />
 
-<!--            <Button-->
-<!--                android:id="@+id/buttonFormatForNATO"-->
-<!--                android:layout_width="0dp"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:layout_weight="1"-->
-<!--                android:text="NDEF"-->
-<!--                android:textAllCaps="false"-->
-<!--                android:textColor="@android:color/holo_red_dark" />-->
+            <Button
+                android:id="@+id/buttonFormatForNATO"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="NDEF"
+                android:textAllCaps="false"
+                android:textColor="@android:color/holo_red_dark" />
 
             <Button
                 android:id="@+id/buttonCardInfo"
