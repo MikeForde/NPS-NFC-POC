@@ -18,7 +18,7 @@ It accompanies the IPS MERN WebApp and demonstrates how NATO-aligned patient sum
 ### 🔹 Dual NFC Reader Support
 The app is reader-agnostic and supports two methods of interacting with NFC cards:
 1.  **Internal NFC**: Use the Android device's built-in NFC antenna.
-2.  **External USB Reader**: Support for the **ACS ACR122U** USB NFC reader. When connected via USB-OTG, the app automatically detects the reader and uses it as a high-performance alternative for card operations.
+2.  **External USB Reader**: Support for the **ACS ACR series** USB NFC readers. The app definitely supports the **ACR122U**, **ACR1252U**, and **ACR1552U**. When connected via USB-OTG, the app automatically detects the reader and uses it as a high-performance alternative for card operations.
 
 ### 🔹 Three NFC Storage Modes
 The app supports three distinct NFC layouts, selectable from the UI:
@@ -46,7 +46,7 @@ The app integrates with the IPS MERN WebApp to fetch patient data.
 ## Hardware & Card Requirements
 - **Cards**: MIFARE DESFire EV1 / EV2 / EV3 (8KB or 16KB recommended).
 - **Internal NFC**: Android device with NFC and IsoDep support.
-- **External NFC**: ACS ACR122U USB reader + USB-OTG adapter.
+- **External NFC**: ACS USB reader (ACR122U, ACR1252U, or ACR1552U) + USB-OTG adapter.
 
 ## Technical Highlights
 ### Reader-Agnostic Architecture
@@ -73,7 +73,7 @@ The app uses a unified `ApduTransport` interface. This abstraction allows the co
 
 ## Development & Testing Notes
 ### External Reader Usage
-1. Connect the ACR122U to the Android device.
+1. Connect the ACS reader to the Android device.
 2. Grant USB permission when prompted.
 3. Select an action (e.g., "Read DES") and tap the card on the USB reader.
 
