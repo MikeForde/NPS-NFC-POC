@@ -28,9 +28,14 @@ import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TabHost
 import androidx.appcompat.app.AlertDialog
+import android.content.Context
+import android.hardware.usb.UsbManager
 
 
 class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
+
+    private var acr122uController: Acr122uUsbController? = null
+    private var acr122uReader: Acr122uReader? = null
 
     // Authoritative in-app payloads (NOT the textboxes)
     private var roBytes: ByteArray = ByteArray(0)
@@ -184,6 +189,12 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
               "entries": [ "Recent BP", "New medication" ]
             }
         """.trimIndent().toByteArray(Charsets.UTF_8)
+
+    override fun onDestroy() {
+        acr122uReader?.close()
+        acr122uController?.stop()
+        super.onDestroy()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -357,6 +368,51 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         enableInnerScrolling(textRw)
         updateTabSizes()
 
+        val usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
+
+        acr122uReader = Acr122uReader(
+            usbManager = usbManager,
+            onStatus = { message ->
+                runOnUiThread {
+                    Log.d("ACR122U", message)
+                    statusText.text = message
+                }
+            },
+            onUid = { uid ->
+                runOnUiThread {
+                    Log.d("ACR122U", "UID from external reader: $uid")
+                    statusText.text = "External ACR122U UID:\n$uid"
+                }
+            },
+            onCardPresent = { transport, uid ->
+                handleTransportDiscovered(
+                    transport = transport,
+                    sourceLabel = "External ACR122U",
+                    uid = uid
+                )
+            }
+        )
+
+        acr122uController = Acr122uUsbController(
+            context = this,
+            onStatus = { message ->
+                runOnUiThread {
+                    Log.d("ACR122U", message)
+                    statusText.text = message
+                }
+            },
+            onReaderReady = { device ->
+                runOnUiThread {
+                    Log.d("ACR122U", "Reader ready: ${device.deviceName}")
+                    statusText.text = "ACR122U ready: ${device.productName ?: device.deviceName}"
+                }
+
+                acr122uReader?.open(device)
+            }
+        )
+
+        acr122uController?.start()
+
 
 // load once at startup
         refreshIpsList()
@@ -370,6 +426,80 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     override fun onPause() {
         super.onPause()
         disableReaderMode()
+    }
+
+    private fun handleTransportDiscovered(
+        transport: ApduTransport,
+        sourceLabel: String,
+        uid: String? = null
+    ) {
+        val currentAction = pendingAction
+
+        if (currentAction == PendingAction.NONE) {
+            runOnUiThread {
+                statusText.text = buildString {
+                    append("$sourceLabel card detected")
+                    if (uid != null) append("\nUID: $uid")
+                }
+            }
+            return
+        }
+
+        if (currentAction == PendingAction.CARD_INFO) {
+            try {
+                val helper = DesfireHelper.connect(transport, debug = true)
+                val versionSummary = helper.getVersionSummary() ?: "Version: unavailable"
+                val cardUid = helper.getUidHex() ?: uid ?: "UID unavailable"
+
+                runOnUiThread {
+                    statusText.text = "$sourceLabel card info\nUID: $cardUid\n$versionSummary"
+                    pendingAction = PendingAction.NONE
+                }
+
+                helper.close()
+            } catch (e: Exception) {
+                runOnUiThread {
+                    statusText.text = "$sourceLabel card info error: ${e.message}"
+                    pendingAction = PendingAction.NONE
+                }
+                transport.close()
+            }
+            return
+        }
+
+        val helper = try {
+            DesfireHelper.connect(transport, debug = true)
+        } catch (e: Exception) {
+            runOnUiThread {
+                statusText.text = "$sourceLabel DESFire connect failed: ${e.message}"
+                pendingAction = PendingAction.NONE
+            }
+            transport.close()
+            return
+        }
+
+        try {
+            when (currentAction) {
+                PendingAction.WRITE -> handleWrite(helper)
+                PendingAction.READ -> handleRead(helper)
+                PendingAction.FORMAT -> handleFormat(helper)
+
+                else -> {
+                    runOnUiThread {
+                        statusText.text =
+                            "$sourceLabel mode not yet transport-enabled: $currentAction"
+                        pendingAction = PendingAction.NONE
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            runOnUiThread {
+                statusText.text = "$sourceLabel error: ${e.message}"
+                pendingAction = PendingAction.NONE
+            }
+        } finally {
+            helper.close()
+        }
     }
 
     private fun enableReaderMode() {
@@ -585,6 +715,63 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         val currentAction = pendingAction
         if (currentAction == PendingAction.NONE) return
 
+        /*
+         * Shared APDU transport path.
+         *
+         * These modes now use:
+         *
+         * Built-in NFC Tag
+         *   -> AndroidIsoDepTransport
+         *   -> handleTransportDiscovered(...)
+         *   -> DesfireHelper.connect(transport)
+         *
+         * This mirrors the ACR122U path:
+         *
+         * ACR122U
+         *   -> Acr122uApduTransport
+         *   -> handleTransportDiscovered(...)
+         *   -> DesfireHelper.connect(transport)
+         */
+        val canUseSharedTransport =
+            currentAction == PendingAction.CARD_INFO ||
+                    currentAction == PendingAction.WRITE ||
+                    currentAction == PendingAction.READ ||
+                    currentAction == PendingAction.FORMAT
+
+        if (canUseSharedTransport) {
+            val transport = AndroidIsoDepTransport.connect(tag)
+
+            if (transport == null) {
+                runOnUiThread {
+                    Toast.makeText(
+                        this,
+                        "Tag is not DESFire / IsoDep connect failed",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    statusText.text = "Built-in NFC: IsoDep connect failed"
+                }
+                return
+            }
+
+            val uid = tag.id?.joinToString(":") {
+                "%02X".format(it.toInt() and 0xFF)
+            }
+
+            handleTransportDiscovered(
+                transport = transport,
+                sourceLabel = "Built-in NFC",
+                uid = uid
+            )
+
+            return
+        }
+
+        /*
+         * Built-in NFC only for now.
+         *
+         * These still depend on Android Tag / Ndef.get(tag) / helper.connect(tag).
+         * We will refactor NDEFHelper and NATOHelper next.
+         */
         if (currentAction == PendingAction.CARD_INFO) {
             try {
                 handleCardInfo(tag)
@@ -596,11 +783,9 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             return
         }
 
-
-        // 🔹 Special case: WRITE_DUAL_NDEF uses NDEFHelper, so do NOT open DesfireHelper here
         if (currentAction == PendingAction.WRITE_DUAL_NDEF) {
             try {
-                handleWriteDualNdef(tag)   // this will call NDEFHelper.connect(...)
+                handleWriteDualNdef(tag)
             } catch (e: Exception) {
                 e.printStackTrace()
                 runOnUiThread {
@@ -610,10 +795,9 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             return
         }
 
-        // 🔹 Special case: WRITE_DUAL_NDEF uses NDEFHelper, so do NOT open DesfireHelper here
         if (currentAction == PendingAction.FORMAT_FOR_NDEF) {
             try {
-                handleFormatForDualNdef(tag)   // this will call NDEFHelper.connect(...)
+                handleFormatForDualNdef(tag)
             } catch (e: Exception) {
                 e.printStackTrace()
                 runOnUiThread {
@@ -628,10 +812,9 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             return
         }
 
-        // 🔹 Special case: NATO layout (000001 with two NDEF files) uses NATOHelper
         if (currentAction == PendingAction.WRITE_NATO) {
             try {
-                handleWriteNato(tag)   // this should call NATOHelper.connect(...)
+                handleWriteNato(tag)
             } catch (e: Exception) {
                 e.printStackTrace()
                 runOnUiThread {
@@ -643,7 +826,7 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
         if (currentAction == PendingAction.READ_NATO) {
             try {
-                handleReadNato(tag)    // this should call NATOHelper.connect(...)
+                handleReadNato(tag)
             } catch (e: Exception) {
                 e.printStackTrace()
                 runOnUiThread {
@@ -655,7 +838,7 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
         if (currentAction == PendingAction.FORMAT_NATO) {
             try {
-                handleFormatForNato(tag)    // this should call NATOHelper.connect(...)
+                handleFormatForNato(tag)
             } catch (e: Exception) {
                 e.printStackTrace()
                 runOnUiThread {
@@ -665,42 +848,8 @@ class MainActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             return
         }
 
-        // 🔹 All other actions use DesfireHelper as before
-        val helper = DesfireHelper.connect(tag, debug = true)
-        if (helper == null) {
-            runOnUiThread {
-                Toast.makeText(
-                    this,
-                    "Tag is not DESFire / IsoDep connect failed",
-                    Toast.LENGTH_SHORT
-                ).show()
-                statusText.text = "Not a DESFire EVx card or connection error"
-            }
-            return
-        }
-
-        try {
-            when (currentAction) {
-                PendingAction.WRITE -> handleWrite(helper)
-                PendingAction.READ  -> handleRead(helper)
-                PendingAction.FORMAT -> handleFormat(helper)
-                PendingAction.WRITE_DUAL_NDEF -> Unit
-                PendingAction.FORMAT_FOR_NDEF -> Unit
-                PendingAction.READ_DUAL_NDEF -> Unit
-                PendingAction.WRITE_NATO -> Unit
-                PendingAction.READ_NATO -> Unit
-                PendingAction.FORMAT_NATO -> Unit
-                PendingAction.CARD_INFO -> Unit
-                PendingAction.NONE  -> Unit
-                // 🚫 no WRITE_DUAL_NDEF here anymore
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            runOnUiThread {
-                statusText.text = "Error: ${e.message}"
-            }
-        } finally {
-            helper.close()
+        runOnUiThread {
+            statusText.text = "Unhandled NFC action: $currentAction"
         }
     }
 

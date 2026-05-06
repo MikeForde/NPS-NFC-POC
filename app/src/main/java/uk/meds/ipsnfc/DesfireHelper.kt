@@ -1,12 +1,12 @@
 package uk.meds.ipsnfc
 
 import android.nfc.Tag
-import android.nfc.tech.IsoDep
+//import android.nfc.tech.IsoDep
 import android.util.Log
 import nfcjlib.core.DESFireAdapter
 import nfcjlib.core.DESFireEV1
 import nfcjlib.core.KeyType
-import com.github.skjolber.desfire.ev1.model.command.DefaultIsoDepWrapper
+//import com.github.skjolber.desfire.ev1.model.command.DefaultIsoDepWrapper
 import com.github.skjolber.desfire.ev1.model.file.StandardDesfireFile;
 
 // Our test application + files on the card
@@ -46,7 +46,7 @@ data class TestPayload(
  *  - expose simple helpers for reading/writing a standard data file
  */
 class DesfireHelper private constructor(
-    private val isoDep: IsoDep,
+    private val transport: ApduTransport,
     val desfire: DESFireEV1
 ) {
     /**
@@ -262,30 +262,34 @@ class DesfireHelper private constructor(
         private const val TAG = "DesfireHelper"
 
         fun connect(tag: Tag, debug: Boolean = false): DesfireHelper? {
-            val isoDep = IsoDep.get(tag)
-            if (isoDep == null) {
+            val transport = AndroidIsoDepTransport.connect(tag, timeoutMs = 5000)
+
+            if (transport == null) {
                 Log.w(TAG, "Tag does not support IsoDep – not a DESFire EVx card")
                 return null
             }
 
             return try {
-                isoDep.timeout = 5000
-                isoDep.connect()
-
-                // ✅ Correct chain: IsoDep -> Wrapper -> Adapter -> DESFireAdapter -> DESFireEV1
-                val isoDepWrapper = DefaultIsoDepWrapper(isoDep)
-                val adapter = DESFireAdapter(isoDepWrapper, /*print*/ debug)
-
-                val desfire = DESFireEV1().apply {
-                    setAdapter(adapter)
-                }
-
-                DesfireHelper(isoDep, desfire)
+                connect(transport, debug)
             } catch (e: Exception) {
                 Log.e(TAG, "Error connecting to DESFire tag", e)
-                try { isoDep.close() } catch (_: Exception) {}
+                transport.close()
                 null
             }
+        }
+
+        fun connect(
+            transport: ApduTransport,
+            debug: Boolean = false
+        ): DesfireHelper {
+            val wrapper = ApduTransportIsoDepWrapper(transport)
+            val adapter = DESFireAdapter(wrapper, /* print */ debug)
+
+            val desfire = DESFireEV1().apply {
+                setAdapter(adapter)
+            }
+
+            return DesfireHelper(transport, desfire)
         }
     }
 
@@ -293,11 +297,9 @@ class DesfireHelper private constructor(
 
     fun close() {
         try {
-            if (isoDep.isConnected) {
-                isoDep.close()
-            }
+            transport.close()
         } catch (e: Exception) {
-            Log.w(TAG, "Error closing IsoDep", e)
+            Log.w(TAG, "Error closing ${transport.name}", e)
         }
     }
 

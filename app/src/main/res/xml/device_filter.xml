@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ACS ACR122U: 072f:2200 -->
+    <!-- Android expects decimal values: 0x072f = 1839, 0x2200 = 8704 -->
+    <usb-device
+        vendor-id="1839"
+        product-id="8704" />
+</resources>

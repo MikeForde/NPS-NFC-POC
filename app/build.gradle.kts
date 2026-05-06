@@ -81,4 +81,5 @@ dependencies {
     implementation(project(":model"))
     implementation(libs.okhttp)
     implementation(libs.gson)
+    implementation(files("libs/acssmc-1.1.8.aar"))
 }
