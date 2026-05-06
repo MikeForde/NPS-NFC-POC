@@ -13,6 +13,7 @@ class Acr122uReader(
 ) {
     private var reader: Reader? = null
     private var currentDevice: UsbDevice? = null
+    private var readerName: String = "External Reader"
 
     @Volatile
     private var activeSlot: Int? = null
@@ -27,6 +28,7 @@ class Acr122uReader(
             val r = Reader(usbManager)
             reader = r
             currentDevice = device
+            readerName = device.productName ?: "External Reader"
 
             r.setOnStateChangeListener { slotNum, prevState, currState ->
                 Log.d(TAG, "Slot $slotNum state changed: $prevState -> $currState")
@@ -40,7 +42,7 @@ class Acr122uReader(
                     activeSlot = slotNum
                     cardBusy = true
 
-                    onStatus("ACR122U: card present")
+                    onStatus("$readerName: card present")
 
                     try {
                         readUid(slotNum)
@@ -51,26 +53,26 @@ class Acr122uReader(
                 } else if (currState == Reader.CARD_ABSENT) {
                     activeSlot = null
                     cardBusy = false
-                    onStatus("ACR122U: card removed")
+                    onStatus("$readerName: card removed")
                 }
             }
 
             r.open(device)
 
             onStatus(
-                "ACR122U opened: " +
-                        "${device.productName ?: "reader"} " +
+                "Reader opened: " +
+                        "$readerName " +
                         "slots=${r.numSlots}"
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to open ACR122U", e)
-            onStatus("ACR122U open failed: ${e.message}")
+            Log.e(TAG, "Failed to open $readerName", e)
+            onStatus("$readerName open failed: ${e.message}")
             close()
         }
     }
 
     private fun transceive(slotNum: Int, command: ByteArray): ByteArray {
-        val r = reader ?: throw IllegalStateException("ACR122U reader not open")
+        val r = reader ?: throw IllegalStateException("Reader not open")
 
         val response = ByteArray(4096)
 
@@ -87,7 +89,7 @@ class Acr122uReader(
 
     private fun readUid(slotNum: Int) {
         val r = reader ?: run {
-            onStatus("ACR122U: reader not open")
+            onStatus("$readerName: reader not open")
             return
         }
 
@@ -130,15 +132,15 @@ class Acr122uReader(
             ) {
                 val uid = actual.copyOfRange(0, actual.size - 2).toHex(":")
                 onUid(uid)
-                onStatus("ACR122U UID: $uid")
+                onStatus("$readerName UID: $uid")
                 val transport = Acr122uApduTransport(r, slotNum)
                 onCardPresent(transport, uid)
             } else {
-                onStatus("ACR122U UID read failed: ${actual.toHex()}")
+                onStatus("$readerName UID read failed: ${actual.toHex()}")
             }
         } catch (e: Exception) {
             Log.e(TAG, "UID read failed", e)
-            onStatus("ACR122U UID read error: ${e.message}")
+            onStatus("$readerName UID read error: ${e.message}")
         }
     }
 
@@ -146,10 +148,11 @@ class Acr122uReader(
         try {
             reader?.close()
         } catch (e: Exception) {
-            Log.w(TAG, "Error closing ACR122U", e)
+            Log.w(TAG, "Error closing $readerName", e)
         } finally {
             reader = null
             currentDevice = null
+            readerName = "External Reader"
         }
     }
 
