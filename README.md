@@ -18,7 +18,7 @@ It accompanies the IPS MERN WebApp and demonstrates how NATO-aligned patient sum
 ### 🔹 Dual NFC Reader Support
 The app is reader-agnostic and supports two methods of interacting with NFC cards:
 1.  **Internal NFC**: Use the Android device's built-in NFC antenna.
-2.  **External USB Reader**: Support for the **ACS ACR series** USB NFC readers. The app definitely supports the **ACR122U**, **ACR1252U**, and **ACR1552U**. When connected via USB-OTG, the app automatically detects the reader and uses it as a high-performance alternative for card operations.
+2.  **External USB Reader**: Support for the **ACS ACR series** USB NFC readers. The app definitely supports the **ACR122U**, **ACR1252U**, and **ACR1552U**. When connected via USB-OTG, the app automatically detects the reader and uses it as an alternative for card operations. Note, performance is slightly slower than for inbuilt NFC.
 
 ### 🔹 Three NFC Storage Modes
 The app supports three distinct NFC layouts, selectable from the UI:
